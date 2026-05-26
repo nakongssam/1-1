@@ -1,3 +1,3 @@
 import streamlit as st
-st.title('1-1 하이')
-st.write('메롱')
+st.title('1-1 방가')
+st.write('엵공')
