@@ -1,45 +1,36 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 
 # 페이지 설정
 st.set_page_config(
-    page_title="축구 챗봇",
-    page_icon="⚽",
+    page_title="연애상담 챗봇",
+    page_icon="❤️"
 )
 
-st.title("⚽ 축구 챗봇")
-st.caption("Gemini 2.5 Flash Lite 기반")
+st.title("❤️ 연애상담 챗봇")
 
-# API 키 확인
+# API 키 불러오기
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
 except Exception:
-    st.error("Secrets에 GEMINI_API_KEY가 설정되지 않았습니다.")
+    st.error("GEMINI_API_KEY를 Secrets에 설정해주세요.")
     st.stop()
 
-# Gemini 클라이언트 생성
-try:
-    client = genai.Client(api_key=api_key)
-except Exception as e:
-    st.error(f"Gemini 초기화 오류: {e}")
-    st.stop()
+# 모델 생성
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 # 채팅 기록 저장
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": "안녕하세요! ⚽ 축구 관련 질문을 해주세요. 선수, 전술, 리그, 경기 분석 등 무엇이든 가능합니다."
-        }
-    ]
+    st.session_state.messages = []
 
 # 기존 대화 출력
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
 # 사용자 입력
-prompt = st.chat_input("축구에 대해 질문해보세요")
+prompt = st.chat_input("연애 고민을 입력하세요")
 
 if prompt:
     # 사용자 메시지 저장
@@ -51,51 +42,37 @@ if prompt:
         st.markdown(prompt)
 
     try:
-        # 대화 기록 구성
-        history = ""
+        # 최근 대화 기록 생성
+        history_text = ""
 
-        for msg in st.session_state.messages:
-            role = "사용자" if msg["role"] == "user" else "챗봇"
-            history += f"{role}: {msg['content']}\n"
+        for msg in st.session_state.messages[-10:]:
+            role = "사용자" if msg["role"] == "user" else "상담사"
+            history_text += f"{role}: {msg['content']}\n"
 
-        soccer_prompt = f"""
-당신은 축구 전문 AI 코치입니다.
+        full_prompt = f"""
+당신은 따뜻하고 공감 능력이 뛰어난 연애상담 전문가입니다.
 
 규칙:
-- 축구 관련 질문에 전문적으로 답변한다.
-- 선수, 전술, 리그, 경기 분석에 강하다.
-- 친절하고 이해하기 쉽게 설명한다.
+- 공감적으로 답변한다.
+- 비난하지 않는다.
+- 현실적인 조언을 제공한다.
+- 답변은 300자 이내로 작성한다.
 
-대화 기록:
-{history}
+대화 내용:
+{history_text}
+
+상담 답변:
 """
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
-            contents=soccer_prompt
-        )
-
+        response = model.generate_content(full_prompt)
         answer = response.text
 
+        with st.chat_message("assistant"):
+            st.markdown(answer)
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": answer}
+        )
+
     except Exception as e:
-        answer = f"오류가 발생했습니다.\n\n{str(e)}"
-
-    with st.chat_message("assistant"):
-        st.markdown(answer)
-
-    st.session_state.messages.append(
-        {"role": "assistant", "content": answer}
-    )
-
-# 사이드바
-with st.sidebar:
-    st.header("⚽ 축구 챗봇")
-
-    if st.button("대화 초기화"):
-        st.session_state.messages = [
-            {
-                "role": "assistant",
-                "content": "안녕하세요! ⚽ 축구 관련 질문을 해주세요."
-            }
-        ]
-        st.rerun()
+        st.error(f"오류 발생: {e}")
